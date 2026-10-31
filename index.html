@@ -79,6 +79,8 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
 [hidden]{display:none!important}
 .sec{font-family:var(--display);font-weight:700;font-size:1.05rem;letter-spacing:.12em;color:var(--muted);margin:6px 0 -10px}
 .pod .freq{font-size:1.5rem}
+.epnav{padding:0 14px 12px}
+button.small:disabled{opacity:.45;cursor:default}
 .pod audio{display:block;width:calc(100% - 28px);margin:0 14px 12px}
 @media (prefers-reduced-motion:reduce){.needle{transition:none}}
 </style>
@@ -109,6 +111,10 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
       <span class="act" id="podAct"></span>
     </button>
     <div class="status" id="podStatus" hidden></div>
+    <div class="btns epnav" id="podNav" hidden>
+      <button class="small" type="button" id="podOlder">‹ Παλαιότερο</button>
+      <button class="small" type="button" id="podNewer">Νεότερο ›</button>
+    </div>
     <audio id="podAudio" controls preload="none" hidden></audio>
   </section>
 
@@ -278,12 +284,13 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
   });
 
   // Podcast: το τελευταίο επεισόδιο από το RSS του The NewsWorthy
-  var FEED="https://thenewsworthy.libsyn.com/rss", episode=null;
+  var FEED="https://thenewsworthy.libsyn.com/rss", episode=null, episodes=[], idx=0;
   var APPLE="https://podcasts.apple.com/us/podcast/the-newsworthy/id1273619588";
   var PAUSE='<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
   var pod=document.getElementById("pod"), podBtn=document.getElementById("podBtn"),
       podAct=document.getElementById("podAct"), podStatus=document.getElementById("podStatus"),
-      podAudio=document.getElementById("podAudio");
+      podAudio=document.getElementById("podAudio"), podNav=document.getElementById("podNav"),
+      podOlder=document.getElementById("podOlder"), podNewer=document.getElementById("podNewer");
   podAct.innerHTML=PLAY;
 
   function podSay(text,links){
@@ -305,25 +312,31 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
   function fmtDate(d){try{return new Date(d).toLocaleDateString("el-GR",{day:"numeric",month:"long"});}catch(e){return "";}}
   function fromXml(txt){
     var doc=new DOMParser().parseFromString(txt,"text/xml");
-    var item=doc.querySelector("item");if(!item)throw new Error("no item");
-    var enc=item.querySelector("enclosure"),ti=item.querySelector("title"),pd=item.querySelector("pubDate");
-    if(!enc)throw new Error("no enclosure");
-    return {url:enc.getAttribute("url"),title:ti?ti.textContent.trim():"",date:pd?pd.textContent:""};
+    var out=[];
+    Array.prototype.slice.call(doc.querySelectorAll("item"),0,15).forEach(function(item){
+      var enc=item.querySelector("enclosure"),ti=item.querySelector("title"),pd=item.querySelector("pubDate");
+      if(enc&&enc.getAttribute("url"))out.push({url:enc.getAttribute("url"),title:ti?ti.textContent.trim():"",date:pd?pd.textContent:""});
+    });
+    if(!out.length)throw new Error("no items");
+    return out;
   }
   function fromJson(j){
-    var it=j&&j.items&&j.items[0];
-    var u=it&&it.enclosure&&(it.enclosure.link||it.enclosure.url);
-    if(!u)throw new Error("no item");
-    return {url:u,title:it.title||"",date:it.pubDate||""};
+    var out=[];
+    ((j&&j.items)||[]).slice(0,15).forEach(function(it){
+      var u=it.enclosure&&(it.enclosure.link||it.enclosure.url);
+      if(u)out.push({url:u,title:it.title||"",date:it.pubDate||""});
+    });
+    if(!out.length)throw new Error("no items");
+    return out;
   }
-  function getEpisode(){
-    if(episode)return Promise.resolve(episode);
+  function getEpisodes(){
+    if(episodes.length)return Promise.resolve(episodes);
     return fetch(FEED).then(function(r){if(!r.ok)throw new Error("http");return r.text();}).then(fromXml)
       .catch(function(){
         return fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(FEED))
           .then(function(r){return r.json();}).then(fromJson);
       })
-      .then(function(e){episode=e;return e;});
+      .then(function(l){episodes=l;return l;});
   }
   function beforePod(){
     if(current||hls||audio.getAttribute("src"))stop();
@@ -336,22 +349,28 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
   podBtn.addEventListener("click",function(){
     if(!podAudio.paused){podAudio.pause();return;}
     if(podAudio.getAttribute("src")){beforePod();playPod();return;}
-    podSay("Φόρτωση τελευταίου επεισοδίου…");
-    getEpisode().then(function(e){
-      beforePod();
-      podAudio.src=e.url;podAudio.hidden=false;
-      var d=fmtDate(e.date);
-      podSay((d?d+" · ":"")+e.title);
-      playPod();
-      try{
-        if("mediaSession" in navigator){
-          navigator.mediaSession.metadata=new MediaMetadata({title:e.title||"The NewsWorthy",artist:"Erica Mandy",album:"The NewsWorthy"});
-          navigator.mediaSession.setActionHandler("play",playPod);
-          navigator.mediaSession.setActionHandler("pause",podPause);
-        }
-      }catch(err){}
-    }).catch(function(){podSay("Δεν φορτώθηκε το επεισόδιο.",true);});
+    podSay("Φόρτωση επεισοδίων…");
+    getEpisodes().then(function(){beforePod();loadEp(0);}).catch(function(){podSay("Δεν φορτώθηκε το επεισόδιο.",true);});
   });
+  function loadEp(i){
+    if(i<0||i>=episodes.length)return;
+    idx=i;episode=episodes[i];
+    podAudio.src=episode.url;podAudio.hidden=false;
+    var d=fmtDate(episode.date);
+    podSay((d?d+" · ":"")+episode.title);
+    podNav.hidden=false;
+    podNewer.disabled=(idx===0);podOlder.disabled=(idx>=episodes.length-1);
+    playPod();
+    try{
+      if("mediaSession" in navigator){
+        navigator.mediaSession.metadata=new MediaMetadata({title:episode.title||"The NewsWorthy",artist:"Erica Mandy",album:"The NewsWorthy"});
+        navigator.mediaSession.setActionHandler("play",playPod);
+        navigator.mediaSession.setActionHandler("pause",podPause);
+      }
+    }catch(err){}
+  }
+  podOlder.addEventListener("click",function(){beforePod();loadEp(idx+1);});
+  podNewer.addEventListener("click",function(){beforePod();loadEp(idx-1);});
   ["play","pause","ended"].forEach(function(ev){podAudio.addEventListener(ev,podUi);});
   podAudio.addEventListener("error",function(){
     if(podAudio.getAttribute("src"))podSay("Το επεισόδιο δεν παίζει εδώ.",true);
