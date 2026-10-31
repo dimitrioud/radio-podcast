@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ράδιο Κύπρου</title>
+<meta name="theme-color" content="#E8EEEB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101615" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: an FM dial strip with a moving needle on top, then one large tappable row per station. */
+:root{
+  color-scheme:light;
+  --bg:#E8EEEB; --card:#F6F9F8; --fg:#14201C; --muted:#5B6B66; --line:#C9D5D0;
+  --accent:#D2452B; --accent-fg:#ffffff; --tick:#7C8D87;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101615; --card:#18211F; --fg:#E4ECE9; --muted:#97A8A2; --line:#2A3835;
+    --accent:#FF6A4D; --accent-fg:#1a0b07; --tick:#6F827B; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101615; --card:#18211F; --fg:#E4ECE9; --muted:#97A8A2; --line:#2A3835;
+  --accent:#FF6A4D; --accent-fg:#1a0b07; --tick:#6F827B; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45;
+  min-height:100vh;
+  padding-top:max(20px,env(safe-area-inset-top,0px));padding-bottom:max(40px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:560px;margin:0 auto;display:grid;gap:20px}
+h1{font-family:var(--display);font-weight:800;font-size:2.1rem;letter-spacing:.02em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.95rem}
+
+.dial{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 14px 10px}
+.dial-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-width:0}
+.now{font-family:var(--display);font-weight:700;font-size:2.4rem;line-height:1;font-variant-numeric:tabular-nums}
+.now small{font-size:1rem;color:var(--muted);margin-left:4px;letter-spacing:.06em}
+.nowname{color:var(--muted);font-size:.95rem;text-align:right;min-width:0;overflow-wrap:anywhere}
+.scale{position:relative;height:46px;margin-top:10px}
+.scale svg{position:absolute;inset:0;width:100%;height:100%}
+.needle{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);left:0%;transition:left .45s cubic-bezier(.3,.7,.2,1)}
+.needle::before{content:"";position:absolute;top:-2px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.labels{position:relative;height:16px;font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.labels span{position:absolute;transform:translateX(-50%)}
+
+.list{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.st{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.st.on{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.row{display:grid;grid-template-columns:78px 1fr auto;align-items:center;gap:12px;width:100%;
+  padding:12px 14px;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;min-height:68px}
+.freq{font-family:var(--display);font-weight:800;font-size:2rem;line-height:1;font-variant-numeric:tabular-nums}
+.name{font-weight:600;font-size:1.05rem;overflow-wrap:anywhere}
+.note{color:var(--muted);font-size:.85rem}
+.act{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;
+  background:var(--accent);color:var(--accent-fg)}
+.act svg{width:20px;height:20px;fill:currentColor}
+.st:not(.on) .act{background:transparent;border:1.5px solid var(--line);color:var(--fg)}
+.row:focus-visible,.cfg summary:focus-visible,button.small:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.status{padding:0 14px 10px;font-size:.88rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
+.status a{color:var(--accent);font-weight:600}
+.cfg{border-top:1px solid var(--line);padding:0 14px}
+.cfg summary{cursor:pointer;color:var(--muted);font-size:.85rem;padding:10px 0;list-style:none}
+.cfg summary::-webkit-details-marker{display:none}
+.cfg[open] summary{padding-bottom:6px}
+.cfg form{display:grid;gap:8px;padding-bottom:12px}
+.cfg label{font-size:.85rem;color:var(--muted)}
+.cfg input{width:100%;min-width:0;font:inherit;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button.small{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.small.main{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+@media (prefers-reduced-motion:reduce){.needle{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ΡΑΔΙΟ ΚΥΠΡΟΥ</h1>
+    <p class="sub">Πατήστε σταθμό για ζωντανή ακρόαση.</p>
+  </header>
+
+  <section class="dial" aria-label="Δέκτης FM">
+    <div class="dial-top">
+      <div class="now" id="nowFreq">--.-<small>MHz</small></div>
+      <div class="nowname" id="nowName">Κανένας σταθμός</div>
+    </div>
+    <div class="scale" id="scale"><svg id="ticks" preserveAspectRatio="none"></svg><div class="needle" id="needle"></div></div>
+    <div class="labels" id="labels"></div>
+  </section>
+
+  <ul class="list" id="list"></ul>
+  <audio id="player" preload="none"></audio>
+</div>
+
+<script>
+(function(){
+  var MIN=87.5, MAX=108;
+  // stream = άμεσος σύνδεσμος ήχου. page = σελίδα ακρόασης σε κατάλογο, για εφεδρική χρήση.
+  var STATIONS=[
+    {id:"trito", freq:94.8, name:"ΡΙΚ Τρίτο Πρόγραμμα", note:"ΡΙΚ · Πολιτισμός και μουσική", page:"https://radio.dubbeh.net/stations/trito-live-3858?listen=1", stream:"https://r1.cloudskep.com/cybcr/cybc3/playlist.m3u8"},
+    {id:"proto", freq:89.4, name:"Ράδιο Πρώτο", note:"87.9 / 89.4 FM · Ενημέρωση και αθλητικά", page:"https://streema.com/radios/Radio_Proto_2", stream:"https://live3.istoikona.net/proxy/radioproto/stream"},
+    {id:"supersport", freq:104.0, name:"Super Sport 104", note:"Αθλητικό ραδιόφωνο", page:"https://radio.dubbeh.net/stations/super-sport-fm-104-0-8581?listen=1", stream:"https://r1.cloudskep.com/radio3/supersportfm/icecast.audio"},
+    {id:"bfbs", freq:91.7, name:"BFBS Cyprus", note:"Αγγλόφωνο · βρετανικές βάσεις", page:"https://radio.dubbeh.net/stations/bfbs-cyprus-17176?listen=1", stream:"https://listen-ssvcbfbs.sharp-stream.com/ssvcbfbs8.mp3?platform=website"},
+    {id:"mix", freq:102.3, name:"Mix FM", note:"102.3 / 90.8 FM · Hits", page:"https://radio.dubbeh.net/stations/mixfm-cyprus-17549?listen=1", stream:"https://n12.radiojar.com/c27wx6pdh8vtv?rj-ttl=5&rj-tok=AAABoZNmpIEAY7qMnaq9rREj3g"},
+    {id:"kiss", freq:89.0, name:"Kiss FM", note:"80s, 90s και σήμερα", page:"https://radio.dubbeh.net/stations/kiss-89-29526?listen=1", stream:"https://securestreams3.autopo.st:1417/89FM"}
+  ];
+  var store={};
+  try{store=JSON.parse(localStorage.getItem("cy-radio-streams")||"{}")||{};}catch(e){store={};}
+  function urlOf(s){return store[s.id]||s.stream||"";}
+  function save(){try{localStorage.setItem("cy-radio-streams",JSON.stringify(store));}catch(e){}}
+
+  var audio=document.getElementById("player"), list=document.getElementById("list");
+  var current=null, msg={}, hls=null, token=0;
+
+  var PLAY='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+  var STOP='<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>';
+
+  // Κλίμακα FM
+  var NS="http://www.w3.org/2000/svg", svg=document.getElementById("ticks");
+  svg.setAttribute("viewBox","0 0 1000 46");
+  for(var f=88;f<=108;f+=0.5){
+    var x=(f-MIN)/(MAX-MIN)*1000, major=(f%2===0), l=document.createElementNS(NS,"line");
+    l.setAttribute("x1",x);l.setAttribute("x2",x);l.setAttribute("y1",major?14:26);l.setAttribute("y2",46);
+    l.setAttribute("stroke","var(--tick)");l.setAttribute("stroke-width",major?2:1);
+    l.setAttribute("vector-effect","non-scaling-stroke");svg.appendChild(l);
+  }
+  STATIONS.forEach(function(s){
+    var x=(s.freq-MIN)/(MAX-MIN)*1000, c=document.createElementNS(NS,"circle");
+    c.setAttribute("cx",x);c.setAttribute("cy",6);c.setAttribute("r",3.5);c.setAttribute("fill","var(--fg)");svg.appendChild(c);
+  });
+  var labels=document.getElementById("labels");
+  [90,95,100,105].forEach(function(f){
+    var sp=document.createElement("span");sp.style.left=((f-MIN)/(MAX-MIN)*100)+"%";sp.textContent=f;labels.appendChild(sp);
+  });
+
+  function setDial(s){
+    document.getElementById("needle").style.left=s?((s.freq-MIN)/(MAX-MIN)*100)+"%":"0%";
+    document.getElementById("nowFreq").innerHTML=(s?s.freq.toFixed(1):"--.-")+"<small>MHz</small>";
+    document.getElementById("nowName").textContent=s?s.name:"Κανένας σταθμός";
+  }
+
+  function link(text,href){
+    var a=document.createElement("a");a.href=href;a.target="_blank";a.rel="noopener";a.textContent=text;return a;
+  }
+
+  function render(){
+    list.innerHTML="";
+    STATIONS.forEach(function(s){
+      var on=current===s.id;
+      var li=document.createElement("li");li.className="st"+(on?" on":"");
+      var b=document.createElement("button");b.className="row";b.type="button";
+      b.setAttribute("aria-pressed",on?"true":"false");
+      b.setAttribute("aria-label",(on?"Διακοπή ":"Ακρόαση ")+s.name);
+      b.innerHTML='<span class="freq">'+s.freq.toFixed(1)+'</span><span><span class="name"></span><br><span class="note"></span></span><span class="act">'+(on?STOP:PLAY)+'</span>';
+      b.querySelector(".name").textContent=s.name;
+      b.querySelector(".note").textContent=s.note;
+      b.addEventListener("click",function(){if(current===s.id)stop();else play(s);});
+      li.appendChild(b);
+
+      var m=msg[s.id];
+      if(m){
+        var st=document.createElement("div");st.className="status";
+        var t=document.createElement("span");t.textContent=m.t;st.appendChild(t);
+        if(m.links){
+          var u=urlOf(s);
+          if(u)st.appendChild(link("Άνοιγμα ήχου σε νέα καρτέλα",u));
+          st.appendChild(link("Σελίδα ακρόασης",s.page));
+        }
+        li.appendChild(st);
+      }
+
+      var d=document.createElement("details");d.className="cfg";
+      d.innerHTML='<summary>⚙ Άμεσο stream</summary><form><label></label><input type="url" inputmode="url" placeholder="https://…" autocomplete="off"><div class="btns"><button class="small main" type="submit">Αποθήκευση</button><button class="small" type="button" data-clear>Επαναφορά</button><button class="small" type="button" data-copy>Αντιγραφή</button></div></form>';
+      var lab=d.querySelector("label"),inp=d.querySelector("input");
+      inp.id="url-"+s.id;lab.setAttribute("for",inp.id);
+      lab.textContent="Σύνδεσμος ήχου (https) για "+s.name+". Η Επαναφορά γυρίζει στον αρχικό σύνδεσμο.";
+      inp.value=urlOf(s);
+      d.querySelector("form").addEventListener("submit",function(e){
+        e.preventDefault();var v=inp.value.trim();
+        if(v&&!/^https:\/\//i.test(v)){msg[s.id]={t:"Ο σύνδεσμος πρέπει να αρχίζει με https://",links:false};render();return;}
+        if(v&&v!==s.stream)store[s.id]=v;else delete store[s.id];
+        save();delete msg[s.id];if(current===s.id)stop();else render();
+      });
+      var cp=d.querySelector("[data-copy]");
+      cp.addEventListener("click",function(){
+        var u=urlOf(s);if(!u)return;
+        function done(t){cp.textContent=t;setTimeout(function(){cp.textContent="Αντιγραφή";},1800);}
+        try{navigator.clipboard.writeText(u).then(function(){done("Αντιγράφηκε");},function(){inp.focus();inp.select();done("Επιλέχθηκε");});}
+        catch(e){inp.focus();inp.select();done("Επιλέχθηκε");}
+      });
+      d.querySelector("[data-clear]").addEventListener("click",function(){
+        delete store[s.id];save();delete msg[s.id];if(current===s.id)stop();else render();
+      });
+      li.appendChild(d);
+      list.appendChild(li);
+    });
+  }
+
+  function halt(){
+    token++;
+    if(hls){try{hls.destroy();}catch(e){}hls=null;}
+    audio.pause();audio.removeAttribute("src");audio.load();
+  }
+  function stop(){halt();current=null;msg={};setDial(null);render();}
+  function fail(s){halt();current=null;msg={};msg[s.id]={t:"Το stream δεν παίζει εδώ.",links:true};render();}
+
+  function loadHls(cb){
+    if(window.Hls){cb(Hls.isSupported());return;}
+    var sc=document.createElement("script");
+    sc.src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.17/hls.min.js";
+    sc.onload=function(){cb(!!window.Hls&&Hls.isSupported());};
+    sc.onerror=function(){cb(false);};
+    document.head.appendChild(sc);
+  }
+
+  function start(url,my,s){
+    function go(){var p=audio.play();if(p&&p.catch)p.catch(function(){if(my===token)fail(s);});}
+    if(/\.m3u8(\?|$)/i.test(url)&&!audio.canPlayType("application/vnd.apple.mpegurl")){
+      loadHls(function(ok){
+        if(my!==token)return;
+        if(!ok){fail(s);return;}
+        hls=new Hls();
+        hls.on(Hls.Events.ERROR,function(ev,data){if(data&&data.fatal&&my===token)fail(s);});
+        hls.loadSource(url);hls.attachMedia(audio);go();
+      });
+    }else{
+      audio.src=url;go();
+    }
+  }
+
+  function play(s){
+    var url=urlOf(s);
+    if(!url){window.open(s.page,"_blank","noopener");return;}
+    halt();
+    var my=token;
+    current=s.id;msg={};msg[s.id]={t:"Σύνδεση…",links:false};
+    setDial(s);render();
+    start(url,my,s);
+    try{
+      if("mediaSession" in navigator){
+        navigator.mediaSession.metadata=new MediaMetadata({title:s.name,artist:s.freq.toFixed(1)+" FM",album:"Ράδιο Κύπρου"});
+        navigator.mediaSession.setActionHandler("stop",stop);
+        navigator.mediaSession.setActionHandler("pause",stop);
+      }
+    }catch(e){}
+  }
+
+  audio.addEventListener("playing",function(){
+    if(current&&msg[current]&&!msg[current].links){delete msg[current];render();}
+  });
+  audio.addEventListener("error",function(){
+    if(!current||(!hls&&!audio.getAttribute("src")))return;
+    var s=STATIONS.filter(function(x){return x.id===current;})[0];if(s)fail(s);
+  });
+
+  render();
+  if("serviceWorker" in navigator){
+    window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});
+  }
+})();
+</script>
+</body>
+</html>
