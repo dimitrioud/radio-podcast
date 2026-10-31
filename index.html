@@ -76,6 +76,10 @@ h1{font-family:var(--display);font-weight:800;font-size:2.1rem;letter-spacing:.0
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 button.small{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
 button.small.main{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+[hidden]{display:none!important}
+.sec{font-family:var(--display);font-weight:700;font-size:1.05rem;letter-spacing:.12em;color:var(--muted);margin:6px 0 -10px}
+.pod .freq{font-size:1.5rem}
+.pod audio{display:block;width:calc(100% - 28px);margin:0 14px 12px}
 @media (prefers-reduced-motion:reduce){.needle{transition:none}}
 </style>
 </head>
@@ -96,6 +100,18 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
   </section>
 
   <ul class="list" id="list"></ul>
+
+  <h2 class="sec">PODCAST</h2>
+  <section class="st pod" id="pod" aria-label="Podcast The NewsWorthy">
+    <button class="row" id="podBtn" type="button" aria-label="Ακρόαση The NewsWorthy">
+      <span class="freq">POD</span>
+      <span><span class="name">The NewsWorthy</span><br><span class="note">Erica Mandy · ειδήσεις της ημέρας στα αγγλικά, περίπου 10 λεπτά</span></span>
+      <span class="act" id="podAct"></span>
+    </button>
+    <div class="status" id="podStatus" hidden></div>
+    <audio id="podAudio" controls preload="none" hidden></audio>
+  </section>
+
   <audio id="player" preload="none"></audio>
 </div>
 
@@ -238,7 +254,7 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
   function play(s){
     var url=urlOf(s);
     if(!url){window.open(s.page,"_blank","noopener");return;}
-    halt();
+    halt();podPause();
     var my=token;
     current=s.id;msg={};msg[s.id]={t:"Σύνδεση…",links:false};
     setDial(s);render();
@@ -248,6 +264,7 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
         navigator.mediaSession.metadata=new MediaMetadata({title:s.name,artist:s.freq.toFixed(1)+" FM",album:"Ράδιο Κύπρου"});
         navigator.mediaSession.setActionHandler("stop",stop);
         navigator.mediaSession.setActionHandler("pause",stop);
+        navigator.mediaSession.setActionHandler("play",null);
       }
     }catch(e){}
   }
@@ -258,6 +275,86 @@ button.small.main{background:var(--accent);border-color:var(--accent);color:var(
   audio.addEventListener("error",function(){
     if(!current||(!hls&&!audio.getAttribute("src")))return;
     var s=STATIONS.filter(function(x){return x.id===current;})[0];if(s)fail(s);
+  });
+
+  // Podcast: το τελευταίο επεισόδιο από το RSS του The NewsWorthy
+  var FEED="https://thenewsworthy.libsyn.com/rss", episode=null;
+  var APPLE="https://podcasts.apple.com/us/podcast/the-newsworthy/id1273619588";
+  var PAUSE='<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+  var pod=document.getElementById("pod"), podBtn=document.getElementById("podBtn"),
+      podAct=document.getElementById("podAct"), podStatus=document.getElementById("podStatus"),
+      podAudio=document.getElementById("podAudio");
+  podAct.innerHTML=PLAY;
+
+  function podSay(text,links){
+    podStatus.textContent="";podStatus.hidden=!text;
+    if(!text)return;
+    var t=document.createElement("span");t.textContent=text;podStatus.appendChild(t);
+    if(links){
+      if(episode&&episode.url)podStatus.appendChild(link("Άνοιγμα ήχου σε νέα καρτέλα",episode.url));
+      podStatus.appendChild(link("Apple Podcasts",APPLE));
+    }
+  }
+  function podUi(){
+    var playing=!podAudio.paused&&!podAudio.ended;
+    pod.classList.toggle("on",playing);
+    podAct.innerHTML=playing?PAUSE:PLAY;
+    podBtn.setAttribute("aria-label",(playing?"Παύση ":"Ακρόαση ")+"The NewsWorthy");
+  }
+  function podPause(){podAudio.pause();}
+  function fmtDate(d){try{return new Date(d).toLocaleDateString("el-GR",{day:"numeric",month:"long"});}catch(e){return "";}}
+  function fromXml(txt){
+    var doc=new DOMParser().parseFromString(txt,"text/xml");
+    var item=doc.querySelector("item");if(!item)throw new Error("no item");
+    var enc=item.querySelector("enclosure"),ti=item.querySelector("title"),pd=item.querySelector("pubDate");
+    if(!enc)throw new Error("no enclosure");
+    return {url:enc.getAttribute("url"),title:ti?ti.textContent.trim():"",date:pd?pd.textContent:""};
+  }
+  function fromJson(j){
+    var it=j&&j.items&&j.items[0];
+    var u=it&&it.enclosure&&(it.enclosure.link||it.enclosure.url);
+    if(!u)throw new Error("no item");
+    return {url:u,title:it.title||"",date:it.pubDate||""};
+  }
+  function getEpisode(){
+    if(episode)return Promise.resolve(episode);
+    return fetch(FEED).then(function(r){if(!r.ok)throw new Error("http");return r.text();}).then(fromXml)
+      .catch(function(){
+        return fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(FEED))
+          .then(function(r){return r.json();}).then(fromJson);
+      })
+      .then(function(e){episode=e;return e;});
+  }
+  function beforePod(){
+    if(current||hls||audio.getAttribute("src"))stop();
+    document.getElementById("nowName").textContent="Podcast · The NewsWorthy";
+  }
+  function playPod(){
+    var p=podAudio.play();
+    if(p&&p.catch)p.catch(function(){podSay("Το επεισόδιο δεν παίζει εδώ.",true);});
+  }
+  podBtn.addEventListener("click",function(){
+    if(!podAudio.paused){podAudio.pause();return;}
+    if(podAudio.getAttribute("src")){beforePod();playPod();return;}
+    podSay("Φόρτωση τελευταίου επεισοδίου…");
+    getEpisode().then(function(e){
+      beforePod();
+      podAudio.src=e.url;podAudio.hidden=false;
+      var d=fmtDate(e.date);
+      podSay((d?d+" · ":"")+e.title);
+      playPod();
+      try{
+        if("mediaSession" in navigator){
+          navigator.mediaSession.metadata=new MediaMetadata({title:e.title||"The NewsWorthy",artist:"Erica Mandy",album:"The NewsWorthy"});
+          navigator.mediaSession.setActionHandler("play",playPod);
+          navigator.mediaSession.setActionHandler("pause",podPause);
+        }
+      }catch(err){}
+    }).catch(function(){podSay("Δεν φορτώθηκε το επεισόδιο.",true);});
+  });
+  ["play","pause","ended"].forEach(function(ev){podAudio.addEventListener(ev,podUi);});
+  podAudio.addEventListener("error",function(){
+    if(podAudio.getAttribute("src"))podSay("Το επεισόδιο δεν παίζει εδώ.",true);
   });
 
   render();
