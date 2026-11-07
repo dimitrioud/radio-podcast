@@ -139,7 +139,7 @@ button.small:disabled{opacity:.45;cursor:default}
   function save(){try{localStorage.setItem("cy-radio-streams",JSON.stringify(store));}catch(e){}}
 
   var audio=document.getElementById("player"), list=document.getElementById("list");
-  var current=null, msg={}, hls=null, token=0;
+  var current=null, lastId=null, msg={}, hls=null, token=0;
 
   var PLAY='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   var STOP='<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>';
@@ -265,13 +265,34 @@ button.small:disabled{opacity:.45;cursor:default}
     current=s.id;msg={};msg[s.id]={t:"Σύνδεση…",links:false};
     setDial(s);render();
     start(url,my,s);
+    lastId=s.id;
     try{
       if("mediaSession" in navigator){
         navigator.mediaSession.metadata=new MediaMetadata({title:s.name,artist:s.freq.toFixed(1)+" FM",album:"Ράδιο Κύπρου"});
-        navigator.mediaSession.setActionHandler("stop",stop);
-        navigator.mediaSession.setActionHandler("pause",stop);
-        navigator.mediaSession.setActionHandler("play",null);
+        stationKeys();
       }
+    }catch(e){}
+  }
+
+  // Κουμπιά αυτοκινήτου / ακουστικών: επόμενο και προηγούμενο = άλλος σταθμός
+  function step(d){
+    var i=0;
+    for(var k=0;k<STATIONS.length;k++){if(STATIONS[k].id===(current||lastId)){i=k;break;}}
+    var n=(i+d+STATIONS.length)%STATIONS.length;
+    play(STATIONS[n]);
+  }
+  function resume(){
+    var s=STATIONS.filter(function(x){return x.id===lastId;})[0]||STATIONS[0];
+    play(s);
+  }
+  function stationKeys(){
+    try{
+      var ms=navigator.mediaSession;
+      ms.setActionHandler("play",resume);
+      ms.setActionHandler("pause",stop);
+      ms.setActionHandler("stop",stop);
+      ms.setActionHandler("nexttrack",function(){step(1);});
+      ms.setActionHandler("previoustrack",function(){step(-1);});
     }catch(e){}
   }
 
@@ -366,6 +387,8 @@ button.small:disabled{opacity:.45;cursor:default}
         navigator.mediaSession.metadata=new MediaMetadata({title:episode.title||"The NewsWorthy",artist:"Erica Mandy",album:"The NewsWorthy"});
         navigator.mediaSession.setActionHandler("play",playPod);
         navigator.mediaSession.setActionHandler("pause",podPause);
+        navigator.mediaSession.setActionHandler("nexttrack",function(){beforePod();loadEp(idx-1);});
+        navigator.mediaSession.setActionHandler("previoustrack",function(){beforePod();loadEp(idx+1);});
       }
     }catch(err){}
   }
